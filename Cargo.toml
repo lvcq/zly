@@ -12,3 +12,6 @@ tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false }
 zformdata={path="lib/zformdata"}
+redis = "0.15.1"
+rust-crypto = "^0.2"
+uuid = { version = "0.8.1",features = ["serde", "v4"]}

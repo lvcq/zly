@@ -2,3 +2,4 @@
 **/*.rs.bk
 /lib/zformdata/target
 /temp
+**/*.swp
