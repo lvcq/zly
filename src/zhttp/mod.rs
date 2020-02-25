@@ -1,42 +1,17 @@
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use std::convert::Infallible;
+use hyper::{Server};
 use std::net::SocketAddr;
-use zformdata::FormValue;
 
 pub mod middleware;
 pub mod middleware_service;
 pub mod session;
 pub mod session_middleware;
-pub mod timeout;
 pub mod cookie;
+pub mod router;
 
 use middleware_service::MakeSvc;
-use session::{Session, SessionConfig};
+use session::{SessionConfig};
 use session_middleware::SessionMiddleware;
-use timeout::TimeoutLayer;
-async fn handle_connect(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-  let mut response = Response::new(Body::empty());
-
-  match (req.method(), req.uri().path()) {
-    (&Method::GET, "/") => {
-      *response.body_mut() = Body::from("Try POSTing data to /echo");
-    }
-    (&Method::GET, "/validate-logon") => {
-      *response.body_mut() = Body::from("next");
-    }
-    (&Method::POST, "/file/upload") => {
-      let fv: FormValue = zformdata::read_formdata(req).await;
-      println!("form value:{:?}", fv);
-      *response.body_mut() = Body::from("111");
-    }
-    _ => {
-      *response.status_mut() = StatusCode::NOT_FOUND;
-    }
-  };
-
-  Ok(response)
-}
+use router::Router;
 
 pub struct ZHttp {
   port: u16,
@@ -57,10 +32,10 @@ impl ZHttp {
   }
 
   #[tokio::main]
-  pub async fn start_server(&self) {
+  pub async fn start_server(&self,router:Router) {
     let addr = SocketAddr::from(([192, 168, 164, 129], self.port));
     let sess_mi = SessionMiddleware::new(self.session_config.as_ref().unwrap().clone());
-    let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi));
+    let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi,router));
     // 程序关闭处理信号
     let graceful = server.with_graceful_shutdown(shutdown_signal());
     if let Err(e) = graceful.await {

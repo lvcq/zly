@@ -6,15 +6,18 @@ use tower_service::Service;
 
 use super::middleware::{HttpPhase, Middleware, ZRequest};
 use super::session_middleware::SessionMiddleware;
+use super::router::{Router,RouterWorker};
 
 pub struct MiddlewareService {
     session: Arc<Mutex<SessionMiddleware>>,
+    router_worker:Arc<Mutex<RouterWorker>>,
 }
 
 impl MiddlewareService {
-    pub fn new(session_ref: Arc<Mutex<SessionMiddleware>>) -> Self {
+    pub fn new(session_ref: Arc<Mutex<SessionMiddleware>>,router_worker:Arc<Mutex<RouterWorker>>) -> Self {
         MiddlewareService {
             session: session_ref,
+            router_worker
         }
     }
 }
@@ -29,27 +32,32 @@ impl Service<Request<Body>> for MiddlewareService {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        println!("t1");
         let mut response = Response::new(Body::empty());
         let mut zreq = ZRequest::new(req);
         let mut hp: HttpPhase = HttpPhase::HandleRequest;
         let mut sess_t = self.session.lock().unwrap();
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
+        let worker_lock = self.router_worker.lock().unwrap();
         hp = HttpPhase::HandleResponse;
         zreq.session.value = Some(String::from("test-session"));
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
         *response.body_mut() = Body::from("any");
+        worker_lock.free_worker();
         future::ok(response)
     }
 }
 
 pub struct MakeSvc {
     session: Arc<Mutex<SessionMiddleware>>,
+    router: Router,
 }
 
 impl MakeSvc {
-    pub fn new(sess: SessionMiddleware) -> Self {
+    pub fn new(sess: SessionMiddleware,router:Router) -> Self {
         MakeSvc {
             session: Arc::new(Mutex::new(sess)),
+            router
         }
     }
 }
@@ -65,6 +73,8 @@ impl<T> Service<T> for MakeSvc {
 
     fn call(&mut self, _: T) -> Self::Future {
         println!("新连接");
-        future::ok(MiddlewareService::new(self.session.clone()))
+        future::ok(MiddlewareService::new(self.session.clone(),
+        self.router.get_free_worker().clone()
+        ))
     }
 }

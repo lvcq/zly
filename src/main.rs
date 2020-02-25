@@ -19,6 +19,7 @@ extern crate zformdata;
 use zly::zhttp::session::SessionConfig;
 use zly::zhttp::ZHttp;
 use zly::zredis::RedisConfig;
+use zly::router;
 
 fn main() {
     start_server();
@@ -36,6 +37,7 @@ fn start_server() {
         prefix: None,
         secret: None,
     };
+    let zly_router=router::init_router();
     let http_server = ZHttp::new(8000).session_redis(session_config);
-    http_server.start_server();
+    http_server.start_server(zly_router);
 }
