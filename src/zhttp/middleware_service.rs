@@ -64,6 +64,7 @@ impl<T> Service<T> for MakeSvc {
     }
 
     fn call(&mut self, _: T) -> Self::Future {
+        println!("新连接");
         future::ok(MiddlewareService::new(self.session.clone()))
     }
 }

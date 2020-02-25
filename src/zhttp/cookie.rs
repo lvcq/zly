@@ -1,20 +1,22 @@
 pub struct Cookie {
   name: String,
   value: String,
-  demain: Option<String>,
+  domain: Option<String>,
   max_age: Option<u64>,
   http_only: bool,
-  secure: Option<String>,
+  secure: bool,
+  path:Option<String>
 }
 impl Cookie {
   pub fn new(name: &str, value: &str) -> Self {
     Cookie {
       name: String::from(name),
       value: String::from(value),
-      demain: None,
+      domain: None,
       max_age: None,
       http_only: false,
-      secure: None,
+      secure: false,
+      path:None,
     }
   }
   pub fn set_max_age(mut self, age: u64) -> Self {
@@ -27,12 +29,37 @@ impl Cookie {
     self
   }
 
+  pub fn set_path(mut self,path:&str)->Self{
+      self.path = Some(String::from(path));
+      self
+  }
+
+  pub fn set_domain(mut self,domain:&str)-> Self{
+        self.domain = Some(String::from(domain));
+        self
+  }
+
+  pub fn set_secure(mut self,secure:bool)->Self{
+        self.secure = secure;
+        self
+  }
+
+
   /// ### 将cookie信息转化为字符串
   /// > cookie字符串的格式：`key=value; Expires=date/Max-Age=second; Path=path; Domain=domain; Secure; HttpOnly`
   pub fn to_string(&self) -> String {
     let mut res_str = format!("{}={}", self.name, self.value);
     if self.max_age.is_some() {
-      res_str = format!("{}; Max_Age={}", res_str, self.max_age.unwrap());
+      res_str = format!("{}; Max-Age={}", res_str, self.max_age.unwrap());
+    }
+    if self.path.is_some(){
+        res_str = format!("{}; Path={}",res_str, self.path.as_ref().unwrap());
+    }
+    if self.domain.is_some(){
+        res_str = format!("{}; Domain={}",res_str, self.domain.as_ref().unwrap());
+    }
+    if self.secure{
+        res_str = format!("{}; Secure",res_str);
     }
     if self.http_only {
       res_str = format!("{}; HttpOnly", res_str);
