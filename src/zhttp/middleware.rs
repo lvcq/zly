@@ -3,9 +3,9 @@ use hyper::{Body, Request, Response};
 pub trait Middleware {
   fn http_handler(
     &mut self,
-    zreq: &mut ZRequest,
-    response: &mut Response<Body>,
-    hp: &mut HttpPhase,
+    _zreq: &mut ZRequest,
+    _response: &mut Response<Body>,
+    _hp: &mut HttpPhase,
   ) {
   }
 }

@@ -1,17 +1,17 @@
-use hyper::{Server};
+use hyper::Server;
 use std::net::SocketAddr;
 
+pub mod cookie;
 pub mod middleware;
 pub mod middleware_service;
+pub mod router;
 pub mod session;
 pub mod session_middleware;
-pub mod cookie;
-pub mod router;
 
 use middleware_service::MakeSvc;
-use session::{SessionConfig};
-use session_middleware::SessionMiddleware;
 use router::Router;
+use session::SessionConfig;
+use session_middleware::SessionMiddleware;
 
 pub struct ZHttp {
   port: u16,
@@ -32,10 +32,10 @@ impl ZHttp {
   }
 
   #[tokio::main]
-  pub async fn start_server(&self,router:Router) {
+  pub async fn start_server(&self, router: Router) {
     let addr = SocketAddr::from(([192, 168, 164, 129], self.port));
     let sess_mi = SessionMiddleware::new(self.session_config.as_ref().unwrap().clone());
-    let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi,router));
+    let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi, router));
     // 程序关闭处理信号
     let graceful = server.with_graceful_shutdown(shutdown_signal());
     if let Err(e) = graceful.await {
