@@ -1,3 +1,4 @@
+use super::zqueue::Queue;
 use redis;
 use redis::Commands;
 use redis::Connection;
@@ -17,10 +18,6 @@ pub struct RedisPool {
     conn_str: String,
     free_conn_ids: Queue<usize>,
     conns: Vec<Box<Connection>>,
-}
-
-struct Queue<T> {
-    q_data: Vec<T>,
 }
 
 impl RedisPool {
@@ -109,29 +106,5 @@ impl RedisPool {
             }
         }
         Ok(self.free_conn_ids.pop().unwrap())
-    }
-}
-
-impl<T> Queue<T> {
-    fn new() -> Self {
-        Queue { q_data: Vec::new() }
-    }
-
-    fn push(&mut self, item: T) {
-        self.q_data.push(item);
-    }
-
-    fn pop(&mut self) -> Option<T> {
-        let len = self.q_data.len();
-        if len > 0 {
-            let item = self.q_data.remove(0);
-            return Some(item);
-        } else {
-            return None;
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        return self.q_data.len() == 0;
     }
 }
