@@ -50,10 +50,35 @@ impl ZSession {
   pub fn set_is_new(&mut self, is_n: bool) {
     self.is_new = is_n;
   }
+
+  pub fn set_value(&mut self, value:&str){
+        self.value = Some(String::from(value));
+  }
+
+  pub fn set_value_none(&mut self){
+    self.value = None;
+  }
+
   pub fn get_value(&self) -> Option<String> {
     match &self.value {
       Some(str_v) => Some(str_v.clone()),
       None => None,
     }
   }
+
+  pub fn set_key(&mut self,key:&str){
+      self.key =Some(String::from(key));
+  }
+
+  pub fn set_key_none(&mut self){
+    self.key = None;
+  }
+
+  pub fn get_key(&self)->Option<String>{
+        match &self.key{
+            Some(str_k)=>Some(str_k.clone()),
+            None => None
+        }
+  }
+
 }

@@ -1,24 +1,48 @@
 use futures_util::future;
+use http::header::{
+    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
+    ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
+};
 use hyper::{Body, Request, Response};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use tower_service::Service;
 
 use super::middleware::{HttpPhase, Middleware, ZRequest};
+use super::router::{Router, RouterWorker};
 use super::session_middleware::SessionMiddleware;
-use super::router::{Router,RouterWorker};
 
 pub struct MiddlewareService {
     session: Arc<Mutex<SessionMiddleware>>,
-    router_worker:Arc<Mutex<RouterWorker>>,
+    router_worker: Arc<Mutex<RouterWorker>>,
 }
 
 impl MiddlewareService {
-    pub fn new(session_ref: Arc<Mutex<SessionMiddleware>>,router_worker:Arc<Mutex<RouterWorker>>) -> Self {
+    pub fn new(
+        session_ref: Arc<Mutex<SessionMiddleware>>,
+        router_worker: Arc<Mutex<RouterWorker>>,
+    ) -> Self {
         MiddlewareService {
             session: session_ref,
-            router_worker
+            router_worker,
         }
+    }
+
+    fn cors(&self, zreq: &mut ZRequest, response: &mut Response<Body>) {
+        let origin: HeaderValue = match zreq.req.headers().get(ORIGIN) {
+            Some(hv) => hv.clone(),
+            None => "*".parse().unwrap(),
+        };
+        response
+            .headers_mut()
+            .insert(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
+        response.headers_mut().insert(
+            ACCESS_CONTROL_ALLOW_METHODS,
+            "POST, GET, OPTIONS".parse().unwrap(),
+        );
+        response
+            .headers_mut()
+            .insert(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true".parse().unwrap());
     }
 }
 
@@ -32,17 +56,16 @@ impl Service<Request<Body>> for MiddlewareService {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        println!("t1");
         let mut response = Response::new(Body::empty());
         let mut zreq = ZRequest::new(req);
         let mut hp: HttpPhase = HttpPhase::HandleRequest;
         let mut sess_t = self.session.lock().unwrap();
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
         let worker_lock = self.router_worker.lock().unwrap();
+        worker_lock.handler_request(&mut zreq, &mut response, &mut hp);
         hp = HttpPhase::HandleResponse;
-        zreq.session.value = Some(String::from("test-session"));
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
-        *response.body_mut() = Body::from("any");
+        self.cors(&mut zreq, &mut response);
         worker_lock.free_worker();
         future::ok(response)
     }
@@ -54,10 +77,10 @@ pub struct MakeSvc {
 }
 
 impl MakeSvc {
-    pub fn new(sess: SessionMiddleware,router:Router) -> Self {
+    pub fn new(sess: SessionMiddleware, router: Router) -> Self {
         MakeSvc {
             session: Arc::new(Mutex::new(sess)),
-            router
+            router,
         }
     }
 }
@@ -73,8 +96,9 @@ impl<T> Service<T> for MakeSvc {
 
     fn call(&mut self, _: T) -> Self::Future {
         println!("新连接");
-        future::ok(MiddlewareService::new(self.session.clone(),
-        self.router.get_free_worker()
+        future::ok(MiddlewareService::new(
+            self.session.clone(),
+            self.router.get_free_worker(),
         ))
     }
 }

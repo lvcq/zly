@@ -59,8 +59,37 @@ impl Session {
         Ok(res_vec)
     }
 
-    fn get_session_by_key(&self, key: &str) -> Option<String> {
-        None
+    fn decrypt_str(&self, ciphertext: &[u8]) -> Result<String, String> {
+        let key_bytes = self.secret.as_bytes();
+        let res_vec: Vec<u8>;
+        match self.aes256_cbc_decrypt(ciphertext, &key_bytes[0..16], &key_bytes[0..16]) {
+            Ok(res) => Ok(String::from_utf8_lossy(&res[..]).to_string()),
+            Err(_) => return Err(String::from("session 解密失败")),
+        }
+    }
+
+    pub fn get_session_by_key(&mut self, key: &str) -> Option<String> {
+        let redis_key = format!("{}:{}", self.prefix, key);
+        match self.redis_conn_pool.get::<String>(&redis_key) {
+            Some(res) => {
+                let vec_str: Vec<&str> = res
+                    .trim_matches(|p| p == '[' || p == ']')
+                    .split(',')
+                    .collect();
+                let vec_u8: Vec<u8> = vec_str
+                    .into_iter()
+                    .map(|i| i.parse::<u8>().unwrap())
+                    .collect();
+                match self.decrypt_str(&vec_u8[..]) {
+                    Ok(st) => Some(st),
+                    Err(e) => {
+                        println!("{}", e);
+                        None
+                    }
+                }
+            }
+            None => return None,
+        }
     }
 
     fn aes256_cbc_encrypt(
@@ -69,17 +98,14 @@ impl Session {
         key: &[u8],
         iv: &[u8],
     ) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
-        println!("key:{}", key.len());
         let mut encryptor =
             aes::cbc_encryptor(aes::KeySize::KeySize256, key, iv, blockmodes::PkcsPadding);
         let mut result_vec: Vec<u8> = Vec::new();
         let mut read_buffer = buffer::RefReadBuffer::new(data);
         let mut r_buffer: [u8; 8192] = [0; 8192];
         let mut write_buffer = buffer::RefWriteBuffer::new(&mut r_buffer);
-        println!("test1");
         loop {
             let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true)?;
-            println!("test2");
             result_vec.extend(
                 write_buffer
                     .take_read_buffer()
@@ -93,6 +119,35 @@ impl Session {
             }
         }
         Ok(result_vec)
+    }
+
+    fn aes256_cbc_decrypt(
+        &self,
+        data: &[u8],
+        key: &[u8],
+        iv: &[u8],
+    ) -> Result<Vec<u8>, symmetriccipher::SymmetricCipherError> {
+        let mut decryptor =
+            aes::cbc_decryptor(aes::KeySize::KeySize256, key, iv, blockmodes::PkcsPadding);
+        let mut final_result: Vec<u8> = Vec::new();
+        let mut read_buffer = buffer::RefReadBuffer::new(data);
+        let mut r_buffer: [u8; 8192] = [0; 8192];
+        let mut write_buffer = buffer::RefWriteBuffer::new(&mut r_buffer);
+        loop {
+            let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true)?;
+            final_result.extend(
+                write_buffer
+                    .take_read_buffer()
+                    .take_remaining()
+                    .iter()
+                    .map(|&i| i),
+            );
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => {}
+            }
+        }
+        Ok(final_result)
     }
 
     fn create_session_key(&self) -> String {

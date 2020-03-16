@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 pub struct Cookie {
   name: String,
   value: String,
@@ -7,6 +9,7 @@ pub struct Cookie {
   secure: bool,
   path:Option<String>
 }
+
 impl Cookie {
   pub fn new(name: &str, value: &str) -> Self {
     Cookie {
@@ -19,6 +22,7 @@ impl Cookie {
       path:None,
     }
   }
+
   pub fn set_max_age(mut self, age: u64) -> Self {
     self.max_age = Some(age);
     self
@@ -44,6 +48,14 @@ impl Cookie {
         self
   }
 
+  pub fn get_name(&self)->&str{
+      &self.name
+  }
+
+  pub fn get_value(&self)->&str{
+        &self.value
+  }
+
 
   /// ### 将cookie信息转化为字符串
   /// > cookie字符串的格式：`key=value; Expires=date/Max-Age=second; Path=path; Domain=domain; Secure; HttpOnly`
@@ -67,3 +79,18 @@ impl Cookie {
     res_str
   }
 }
+
+impl FromStr for Cookie{
+    type Err =();
+    
+    fn from_str(s:&str)-> Result<Self,Self::Err>{
+        let key_value:Vec<&str> = s.trim().split("=").collect();
+        if key_value.len() ==2{
+            Ok( Cookie::new( key_value[0],key_value[1]))
+        } else {
+            Err(())
+        }
+    }
+}
+
+

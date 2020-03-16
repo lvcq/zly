@@ -27,7 +27,7 @@ fn main() {
 
 fn start_server() {
     let redis_config = RedisConfig {
-        host: String::from("192.168.164.129"),
+        host: String::from("192.168.47.128"),
         port: 6379,
         database: 1,
         auth: String::from("ck123456"),

@@ -78,7 +78,7 @@ impl RedisPool {
             Ok(index) => index,
             Err(_) => return None,
         };
-        println!("redis-set 使用连接:{},key:{} ", &conn_index, &key);
+        println!("redis-get 使用连接:{},key:{} ", &conn_index, &key);
         let conn = match self.conns.get_mut(conn_index) {
             Some(free_conn) => free_conn,
             None => return None,
@@ -89,6 +89,7 @@ impl RedisPool {
                 return Some(value);
             }
             Err(_) => {
+                println!("获取失败");
                 self.free_conn_ids.push(conn_index);
                 return None;
             }

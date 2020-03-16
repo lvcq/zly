@@ -33,7 +33,7 @@ impl ZHttp {
 
   #[tokio::main]
   pub async fn start_server(&self, router: Router) {
-    let addr = SocketAddr::from(([192, 168, 164, 129], self.port));
+    let addr = SocketAddr::from(([192, 168, 47, 128], self.port));
     let sess_mi = SessionMiddleware::new(self.session_config.as_ref().unwrap().clone());
     let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi, router));
     // 程序关闭处理信号
