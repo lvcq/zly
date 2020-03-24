@@ -8,3 +8,4 @@ pub mod zredis;
 pub mod zqueue;
 pub mod router;
 pub mod zpostgres;
+pub mod lsystem;

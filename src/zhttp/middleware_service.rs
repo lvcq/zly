@@ -1,6 +1,8 @@
 use futures_util::future;
 use http::header::{
-    HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
+    HeaderValue,
+    ACCESS_CONTROL_ALLOW_CREDENTIALS,
+    ACCESS_CONTROL_ALLOW_METHODS,
     ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
 };
 use hyper::{Body, Request, Response};
@@ -11,20 +13,24 @@ use tower_service::Service;
 use super::middleware::{HttpPhase, Middleware, ZRequest};
 use super::router::{Router, RouterWorker};
 use super::session_middleware::SessionMiddleware;
+use crate::zpostgres::{DBWorker, PgPool};
 
 pub struct MiddlewareService {
     session: Arc<Mutex<SessionMiddleware>>,
     router_worker: Arc<Mutex<RouterWorker>>,
+    db_worker: Arc<Mutex<DBWorker>>,
 }
 
 impl MiddlewareService {
     pub fn new(
         session_ref: Arc<Mutex<SessionMiddleware>>,
         router_worker: Arc<Mutex<RouterWorker>>,
+        db_worker: Arc<Mutex<DBWorker>>,
     ) -> Self {
         MiddlewareService {
             session: session_ref,
             router_worker,
+            db_worker,
         }
     }
 
@@ -57,7 +63,7 @@ impl Service<Request<Body>> for MiddlewareService {
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let mut response = Response::new(Body::empty());
-        let mut zreq = ZRequest::new(req);
+        let mut zreq = ZRequest::new(req,self.db_worker.clone());
         let mut hp: HttpPhase = HttpPhase::HandleRequest;
         let mut sess_t = self.session.lock().unwrap();
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
@@ -67,6 +73,8 @@ impl Service<Request<Body>> for MiddlewareService {
         sess_t.http_handler(&mut zreq, &mut response, &mut hp);
         self.cors(&mut zreq, &mut response);
         worker_lock.free_worker();
+        let db_worker= self.db_worker.lock().unwrap();
+        db_worker.free();
         future::ok(response)
     }
 }
@@ -74,6 +82,7 @@ impl Service<Request<Body>> for MiddlewareService {
 pub struct MakeSvc {
     session: Arc<Mutex<SessionMiddleware>>,
     router: Router,
+    pg_pool:PgPool
 }
 
 impl MakeSvc {
@@ -81,6 +90,7 @@ impl MakeSvc {
         MakeSvc {
             session: Arc::new(Mutex::new(sess)),
             router,
+            pg_pool:PgPool::new()
         }
     }
 }
@@ -99,6 +109,7 @@ impl<T> Service<T> for MakeSvc {
         future::ok(MiddlewareService::new(
             self.session.clone(),
             self.router.get_free_worker(),
+            self.pg_pool.get_free_worker()
         ))
     }
 }

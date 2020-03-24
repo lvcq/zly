@@ -1,4 +1,6 @@
 use hyper::{Body, Request, Response};
+use std::sync::{Arc, Mutex};
+use crate::zpostgres::DBWorker;
 
 pub trait Middleware {
   fn http_handler(
@@ -18,13 +20,15 @@ pub enum HttpPhase {
 pub struct ZRequest {
   pub req: Request<Body>,
   pub session: ZSession,
+  pub db_worker: Arc<Mutex<DBWorker>>
 }
 
 impl ZRequest {
-  pub fn new(req: Request<Body>) -> Self {
+  pub fn new(req: Request<Body>,db_worker:Arc<Mutex<DBWorker>>) -> Self {
     ZRequest {
       req,
       session: ZSession::new(),
+      db_worker
     }
   }
   pub fn set_session_is_new(&mut self, is_n: bool) {

@@ -1,9 +1,9 @@
 table! {
     menu (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         menu_name -> Varchar,
         menu_url -> Nullable<Varchar>,
@@ -14,9 +14,9 @@ table! {
 table! {
     opetation (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         opt_name -> Varchar,
         opt_code -> Nullable<Varchar>,
@@ -27,9 +27,9 @@ table! {
 table! {
     page_element (element_id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         element_id -> Varchar,
         element_name -> Varchar,
     }
@@ -46,9 +46,9 @@ table! {
 table! {
     power (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         power_type -> Varchar,
         power_code -> Nullable<Varchar>,
@@ -58,9 +58,9 @@ table! {
 table! {
     power_menu (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         menu_id -> Varchar,
         power_id -> Varchar,
@@ -70,9 +70,9 @@ table! {
 table! {
     power_opt (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         power_id -> Varchar,
         opt_id -> Varchar,
@@ -82,9 +82,9 @@ table! {
 table! {
     power_page_element (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         power_id -> Varchar,
         element_id -> Varchar,
@@ -94,9 +94,9 @@ table! {
 table! {
     role (role_id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         role_id -> Varchar,
         role_name -> Varchar,
     }
@@ -105,9 +105,9 @@ table! {
 table! {
     role_power (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         role_id -> Varchar,
         power_id -> Varchar,
@@ -117,9 +117,9 @@ table! {
 table! {
     user_group (user_group_id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         user_group_id -> Varchar,
         user_group_name -> Nullable<Varchar>,
     }
@@ -128,9 +128,9 @@ table! {
 table! {
     user_group_role (user_group_id, role_id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         user_group_id -> Varchar,
         role_id -> Varchar,
@@ -140,9 +140,9 @@ table! {
 table! {
     user_group_user_info (user_group_id, user_id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         user_group_id -> Varchar,
         user_id -> Varchar,
@@ -151,9 +151,9 @@ table! {
 
 table! {
     user_info (user_id) {
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         user_name -> Varchar,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         user_id -> Varchar,
         password -> Varchar,
         email -> Nullable<Varchar>,
@@ -163,12 +163,12 @@ table! {
 table! {
     user_role (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Nullable<Date>,
+        created_time -> Timestamp,
         updated_by -> Nullable<Varchar>,
-        updated_time -> Nullable<Date>,
+        updated_time -> Timestamp,
         id -> Varchar,
         user_id -> Varchar,
-        role_id -> Nullable<Varchar>,
+        role_id -> Varchar,
     }
 }
 

@@ -12,41 +12,51 @@ use middleware_service::MakeSvc;
 use router::Router;
 use session::SessionConfig;
 use session_middleware::SessionMiddleware;
+use serde::Serialize;
 
 pub struct ZHttp {
-  port: u16,
-  session_config: Option<SessionConfig>,
+    port: u16,
+    session_config: Option<SessionConfig>,
 }
 
 impl ZHttp {
-  pub fn new(port: u16) -> ZHttp {
-    ZHttp {
-      port,
-      session_config: None,
+    pub fn new(port: u16) -> ZHttp {
+        ZHttp {
+            port,
+            session_config: None,
+        }
     }
-  }
 
-  pub fn session_redis(mut self, config: SessionConfig) -> Self {
-    self.session_config = Some(config);
-    return self;
-  }
-
-  #[tokio::main]
-  pub async fn start_server(&self, router: Router) {
-    let addr = SocketAddr::from(([192, 168, 47, 128], self.port));
-    let sess_mi = SessionMiddleware::new(self.session_config.as_ref().unwrap().clone());
-    let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi, router));
-    // 程序关闭处理信号
-    let graceful = server.with_graceful_shutdown(shutdown_signal());
-    if let Err(e) = graceful.await {
-      println!("server error: {}", e);
+    pub fn session_redis(mut self, config: SessionConfig) -> Self {
+        self.session_config = Some(config);
+        return self;
     }
-  }
+
+    #[tokio::main]
+    pub async fn start_server(&self, router: Router) {
+        let addr = SocketAddr::from(([192, 168, 47, 1], self.port));
+        let sess_mi = SessionMiddleware::new(self.session_config.as_ref().unwrap().clone());
+        let server = Server::bind(&addr).serve(MakeSvc::new(sess_mi, router));
+        // 程序关闭处理信号
+        let graceful = server.with_graceful_shutdown(shutdown_signal());
+        if let Err(e) = graceful.await {
+            println!("server error: {}", e);
+        }
+    }
 }
 
 async fn shutdown_signal() {
-  // Wait for the CTRL+C signal
-  tokio::signal::ctrl_c()
-    .await
-    .expect("failed to install CTRL+C signal handler");
+    // Wait for the CTRL+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
+}
+
+#[derive(Serialize)]
+pub struct HttpResult<T>
+    where T: Serialize
+{
+    pub success: bool,
+    pub message: Option<String>,
+    pub data: T,
 }
