@@ -1,16 +1,11 @@
 use futures_util::future;
-use http::header::{
-    HeaderValue,
-    ACCESS_CONTROL_ALLOW_CREDENTIALS,
-    ACCESS_CONTROL_ALLOW_METHODS,
-    ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
-};
+use http::header::{HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN, ACCESS_CONTROL_ALLOW_HEADERS};
 use hyper::{Body, Request, Response};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use tower_service::Service;
 
-use super::middleware::{HttpPhase, Middleware, ZRequest};
+use super::middleware::ZRequest;
 use super::router::{Router, RouterWorker};
 use super::session_middleware::SessionMiddleware;
 use crate::zpostgres::{DBWorker, PgPool};
@@ -35,7 +30,7 @@ impl MiddlewareService {
     }
 
     fn cors(&self, zreq: &mut ZRequest, response: &mut Response<Body>) {
-        let origin: HeaderValue = match zreq.req.headers().get(ORIGIN) {
+        let origin: HeaderValue = match zreq.headers().get(ORIGIN) {
             Some(hv) => hv.clone(),
             None => "*".parse().unwrap(),
         };
@@ -49,6 +44,7 @@ impl MiddlewareService {
         response
             .headers_mut()
             .insert(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true".parse().unwrap());
+        response.headers_mut().insert(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type,content-type".parse().unwrap());
     }
 }
 
@@ -63,18 +59,18 @@ impl Service<Request<Body>> for MiddlewareService {
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let mut response = Response::new(Body::empty());
-        let mut zreq = ZRequest::new(req,self.db_worker.clone());
-        let mut hp: HttpPhase = HttpPhase::HandleRequest;
-        let mut sess_t = self.session.lock().unwrap();
-        sess_t.http_handler(&mut zreq, &mut response, &mut hp);
-        let worker_lock = self.router_worker.lock().unwrap();
-        worker_lock.handler_request(&mut zreq, &mut response, &mut hp);
-        hp = HttpPhase::HandleResponse;
-        sess_t.http_handler(&mut zreq, &mut response, &mut hp);
+        let mut zreq = ZRequest::new(req, self.db_worker.clone());
         self.cors(&mut zreq, &mut response);
-        worker_lock.free_worker();
-        let db_worker= self.db_worker.lock().unwrap();
-        db_worker.free();
+        if zreq.method().as_str() != "OPTIONS" {
+            let mut session_lock = self.session.lock().unwrap();
+            session_lock.get_session(&mut zreq, &mut response);
+            let worker_lock = self.router_worker.lock().unwrap();
+            worker_lock.handler_request(&mut zreq, &mut response);
+            session_lock.set_session(&mut zreq, &mut response);
+            worker_lock.free_worker();
+            let db_worker = self.db_worker.lock().unwrap();
+            db_worker.free();
+        }
         future::ok(response)
     }
 }
@@ -82,7 +78,7 @@ impl Service<Request<Body>> for MiddlewareService {
 pub struct MakeSvc {
     session: Arc<Mutex<SessionMiddleware>>,
     router: Router,
-    pg_pool:PgPool
+    pg_pool: PgPool,
 }
 
 impl MakeSvc {
@@ -90,7 +86,7 @@ impl MakeSvc {
         MakeSvc {
             session: Arc::new(Mutex::new(sess)),
             router,
-            pg_pool:PgPool::new()
+            pg_pool: PgPool::new(),
         }
     }
 }
@@ -109,7 +105,7 @@ impl<T> Service<T> for MakeSvc {
         future::ok(MiddlewareService::new(
             self.session.clone(),
             self.router.get_free_worker(),
-            self.pg_pool.get_free_worker()
+            self.pg_pool.get_free_worker(),
         ))
     }
 }

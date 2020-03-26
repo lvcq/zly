@@ -2,6 +2,7 @@ use super::zpostgres::models::{Role, UserRole};
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::{RunQueryDsl, ExpressionMethods};
 use diesel::PgConnection;
+use crate::yutils::{short_id, current_naive_datetime};
 
 pub fn is_init(conn: &PgConnection) -> bool {
     let role_id: String = match has_root_role(conn) {
@@ -35,5 +36,26 @@ fn has_role_user_ref(r_id: String, conn: &PgConnection) -> Option<Vec<String>> {
     } else {
         let urv = result.iter().map(|ur| { ur.user_id.clone() }).collect();
         Some(urv)
+    }
+}
+
+
+fn create_root_role(role_name: &str, conn: &PgConnection) -> bool {
+    use super::zpostgres::schema::role;
+    let current = current_naive_datetime();
+    let role_id = short_id::generate_short_id(12);
+    let root_role = Role {
+        created_by: None,
+        created_time: current.clone(),
+        updated_by: None,
+        updated_time: current,
+        role_id,
+        role_name: role_name.to_string(),
+    };
+    let result = diesel::insert_into(role::table)
+        .values(&root_role).get_result::<Role>(conn);
+    match result {
+        Ok(_) => true,
+        Err(_) => false
     }
 }

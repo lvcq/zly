@@ -1,20 +1,3 @@
-#[macro_use]
-extern crate serde_derive;
-
-extern crate crypto;
-extern crate futures;
-extern crate futures_util;
-extern crate http;
-extern crate hyper;
-extern crate redis;
-extern crate serde;
-extern crate serde_json;
-extern crate tokio;
-extern crate tokio_timer;
-extern crate tower_layer;
-extern crate tower_service;
-extern crate uuid;
-extern crate zformdata;
 
 use zly::zhttp::session::SessionConfig;
 use zly::zhttp::ZHttp;

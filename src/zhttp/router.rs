@@ -1,11 +1,11 @@
-use super::middleware::{HttpPhase, ZRequest};
+use super::middleware::{ZRequest};
 use crate::zqueue::Queue;
 use http::{Method, Response,StatusCode};
 use hyper::Body;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-type HandlerFn= Box<dyn Fn(&mut ZRequest,&mut Response<Body>,&mut HttpPhase) + Send + 'static>;
+type HandlerFn= Box<dyn Fn(&mut ZRequest,&mut Response<Body>) + Send + 'static>;
 
 pub struct RouterItem {
     pub method: Option<Vec<Method>>,
@@ -57,8 +57,8 @@ impl RouterWorker {
         self.free_worker.lock().unwrap().push(self.id);
     }
     
-    pub fn handler_request(&self,zreq:&mut ZRequest,response:&mut Response<Body>, hp:&mut HttpPhase){
-        let url = zreq.req.uri().path();
+    pub fn handler_request(&self,zreq:&mut ZRequest,response:&mut Response<Body>){
+        let url = zreq.uri().path();
         let item: &RouterItem;
         let default_key= String::from("default-router");
         if self.router_map.contains_key(url){
@@ -70,6 +70,6 @@ impl RouterWorker {
             *response.body_mut()=Body::from("not found");
             return ();
         }
-        (item.handler)(zreq,response,hp);
+        (item.handler)(zreq,response);
     }
 }

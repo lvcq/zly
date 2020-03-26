@@ -1,5 +1,5 @@
 use crate::zhttp::router::{Router, RouterItem};
-use crate::zhttp::middleware::{ZRequest, HttpPhase};
+use crate::zhttp::middleware::ZRequest;
 use hyper::{Response, Body};
 use http::Method;
 use std::collections::HashMap;
@@ -17,28 +17,42 @@ fn create_router_map() -> HashMap<String, RouterItem> {
         method: Some(vec![Method::GET]),
         handler: Box::new(validate_logon),
     };
-    let validate_init_item =RouterItem{
-        method:Some(vec![Method::GET]),
-        handler:Box::new(validate_init)
+    let validate_init_item = RouterItem {
+        method: Some(vec![Method::GET]),
+        handler: Box::new(validate_init),
+    };
+    let set_root_info_item = RouterItem {
+        method: Some(vec![Method::POST]),
+        handler: Box::new(set_root_info),
     };
     router_map.insert(String::from("/zly/validate-logon"), validate_logon_item);
-    router_map.insert(String::from("/zly/is_init"),validate_init_item);
+    router_map.insert(String::from("/zly/is-init"), validate_init_item);
+    router_map.insert(String::from("/zly/set-root-info"), set_root_info_item);
     router_map
 }
 
-fn validate_logon(zreq: &mut ZRequest, response: &mut Response<Body>, _hp: &mut HttpPhase) {
+fn validate_logon(zreq: &mut ZRequest, response: &mut Response<Body>) {
     zreq.session.set_value("validate");
     *response.body_mut() = Body::from("validate");
 }
 
 
-fn validate_init(zreq: &mut ZRequest, response: &mut Response<Body>, _hp: &mut HttpPhase) {
-    let is_init= lsystem::is_init(&zreq.db_worker.lock().unwrap().connection);
-    let res:HttpResult<bool>=HttpResult {
+fn validate_init(zreq: &mut ZRequest, response: &mut Response<Body>) {
+    let is_init = lsystem::is_init(&zreq.db_worker.lock().unwrap().connection);
+    let res: HttpResult<bool> = HttpResult {
         success: true,
         message: None,
-        data: is_init
+        data: is_init,
     };
-    *response.body_mut() =Body::from(serde_json::to_string(&res).unwrap())
+    *response.body_mut() = Body::from(serde_json::to_string(&res).unwrap())
+}
 
+fn set_root_info(zreq: &mut ZRequest, response: &mut Response<Body>) {
+    let res: HttpResult<bool> = HttpResult {
+        success: true,
+        message: None,
+        data: true,
+    };
+    println!("formdata:::{:?}",zreq.formdata());
+    *response.body_mut() = Body::from(serde_json::to_string(&res).unwrap());
 }

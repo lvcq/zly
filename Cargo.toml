@@ -26,3 +26,4 @@ postgres="0.17.1"
 diesel = { version = "1.4.3", features = ["postgres", "chrono"] }
 dotenv = "0.9.0"
 chrono = { version = "0.4", features = ["serde"] }
+rand = "0.7.3"

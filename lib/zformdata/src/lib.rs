@@ -7,7 +7,8 @@ extern crate mime;
 extern crate tokio;
 
 use chrono::Utc;
-use futures::future;
+use futures::{future, StreamExt};
+use futures::stream::AndThen;
 use futures::TryStreamExt as _;
 use hyper::header::HeaderValue;
 use hyper::header::{HeaderMap, CONTENT_DISPOSITION, CONTENT_TYPE};
@@ -16,6 +17,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use futures::executor::block_on;
 
 #[derive(Debug)]
 pub struct FormValue {
@@ -37,16 +39,21 @@ enum BodyReadStatus {
     ReadText(String),
 }
 
-pub async fn read_formdata(req: Request<Body>) -> FormValue {
+pub fn read_formdata(req: Request<Body>) -> FormValue {
     let mut fv = FormValue::new();
     let (parts, body) = req.into_parts();
-    let content_type_value: &HeaderValue = parts.headers.get(CONTENT_TYPE).unwrap();
+    let content_type_value: &HeaderValue = match parts.headers.get(CONTENT_TYPE) {
+        Some(ctv) => ctv,
+        None => return fv
+    };
     match get_content_type(content_type_value) {
         Ok(mi) => {
             if mi == mime::MULTIPART_FORM_DATA {
                 let boundary = get_boundary(content_type_value);
-                fv = read_multipart_body(body, fv, boundary).await;
-            } else {
+                fv = read_multipart_body(body, fv, boundary);
+            } else if mi == mime::APPLICATION_JSON {
+                let body_str = read_json_body(body);
+                println!("content-type:::{:?}", &body_str);
             }
         }
 
@@ -55,7 +62,7 @@ pub async fn read_formdata(req: Request<Body>) -> FormValue {
     fv
 }
 
-async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -> FormValue {
+fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -> FormValue {
     let mut is_first_chunk = true;
     let mut residue: Vec<u8> = Vec::new();
     let mut lt: Vec<u8> = Vec::new();
@@ -63,16 +70,11 @@ async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -
     let mut lt_boundary: Vec<u8> = Vec::new();
     let mut read_status: BodyReadStatus = BodyReadStatus::ReadBoundary;
     let fut = body.try_for_each(|chunk| {
+        println!("test2");
         let mut span: usize = 0;
         let mut chunk_vec: Vec<u8> = Vec::new();
-        println!("residue:{}", residue.len());
         chunk_vec.extend(&residue);
         chunk_vec.extend(chunk.to_vec());
-        println!(
-            "chunk_vec length:{},chunk length:{}",
-            chunk_vec.len(),
-            chunk.to_vec().len()
-        );
         residue.clear();
         let mut buf: Vec<u8>;
         if is_first_chunk {
@@ -90,7 +92,6 @@ async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -
             read_status = BodyReadStatus::ReadHeader;
         }
         loop {
-            println!("read_status:{:?}", &read_status);
             match &read_status {
                 BodyReadStatus::ReadBoundary => match vec_match(&chunk_vec, &boundary, span) {
                     Ok(b_index) => {
@@ -106,7 +107,6 @@ async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -
                     }
                 },
                 BodyReadStatus::ReadHeader => {
-                    println!("header:{}", String::from_utf8_lossy(&chunk_vec[span..]));
                     let header_end = match vec_match(&chunk_vec, &ltlt, span) {
                         Ok(end) => end,
                         Err(_) => {
@@ -281,8 +281,19 @@ async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -
         }
         future::ready(Ok(()))
     });
-    fut.await.expect("parse fail.");
-    fv
+    match block_on(fut){
+        Ok(_)=>fv,
+        Err(_)=>fv
+    }
+}
+
+fn read_json_body(body: Body) -> String {
+    let mut res: Vec<u8> = Vec::new();
+    body.and_then(|chunk| {
+        res.extend(chunk.to_vec());
+        future::ready(Ok(()))
+    });
+    String::from_utf8_lossy(&res[..]).to_string()
 }
 
 /// ####第一次匹配
@@ -413,6 +424,7 @@ impl Drop for MultipartFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
