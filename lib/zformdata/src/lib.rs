@@ -39,7 +39,7 @@ enum BodyReadStatus {
     ReadText(String),
 }
 
-pub fn read_formdata(req: Request<Body>) -> FormValue {
+pub async fn read_formdata(req: Request<Body>) -> FormValue {
     let mut fv = FormValue::new();
     let (parts, body) = req.into_parts();
     let content_type_value: &HeaderValue = match parts.headers.get(CONTENT_TYPE) {
@@ -50,10 +50,9 @@ pub fn read_formdata(req: Request<Body>) -> FormValue {
         Ok(mi) => {
             if mi == mime::MULTIPART_FORM_DATA {
                 let boundary = get_boundary(content_type_value);
-                fv = read_multipart_body(body, fv, boundary);
+                fv = read_multipart_body(body, fv, boundary).await;
             } else if mi == mime::APPLICATION_JSON {
                 let body_str = read_json_body(body);
-                println!("content-type:::{:?}", &body_str);
             }
         }
 
@@ -62,7 +61,7 @@ pub fn read_formdata(req: Request<Body>) -> FormValue {
     fv
 }
 
-fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -> FormValue {
+async fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -> FormValue {
     let mut is_first_chunk = true;
     let mut residue: Vec<u8> = Vec::new();
     let mut lt: Vec<u8> = Vec::new();
@@ -281,10 +280,8 @@ fn read_multipart_body(body: Body, mut fv: FormValue, boundary: Vec<u8>) -> Form
         }
         future::ready(Ok(()))
     });
-    match block_on(fut){
-        Ok(_)=>fv,
-        Err(_)=>fv
-    }
+    fut.await.expect("parse error");
+    fv
 }
 
 fn read_json_body(body: Body) -> String {

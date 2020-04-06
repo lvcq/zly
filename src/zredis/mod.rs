@@ -11,6 +11,15 @@ pub struct RedisConfig {
     pub auth: String,
 }
 
+impl Into<String> for RedisConfig{
+    fn into(self) -> String {
+        return format!(
+            "redis://:{}@{}:{}/{}",
+            self.auth, self.host, self.port, self.database
+        );
+    }
+}
+
 /// ### redis 连接池实现
 ///
 

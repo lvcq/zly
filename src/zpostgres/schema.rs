@@ -157,6 +157,7 @@ table! {
         user_id -> Varchar,
         password -> Varchar,
         email -> Nullable<Varchar>,
+        last_login_time -> Timestamp,
     }
 }
 

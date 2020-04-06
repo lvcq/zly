@@ -3,7 +3,9 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
 use crate::zqueue::Queue;
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::borrow::Borrow;
+use std::rc::Rc;
 
 pub mod models;
 pub mod schema;
@@ -19,48 +21,44 @@ pub fn establish_connection() -> PgConnection {
 }
 
 pub struct PgPool {
-    workers: Vec<Arc<Mutex<DBWorker>>>,
-    free: Arc<Mutex<Queue<usize>>>,
+    workers: RefCell<Vec<Rc<DBWorker>>>,
+    free: RefCell<Queue<usize>>,
 }
 
 pub struct DBWorker {
-    index: usize,
-    free: Arc<Mutex<Queue<usize>>>,
-   pub connection: PgConnection,
+    pub index: usize,
+    pub connection: PgConnection,
 }
 
-impl PgPool {
+impl<'a> PgPool {
     pub fn new() -> Self {
         PgPool {
-            workers: Vec::new(),
-            free: Arc::new(Mutex::new(Queue::new())),
+            workers: RefCell::new(Vec::new()),
+            free: RefCell::new(Queue::new()),
         }
     }
 
-    pub fn get_free_worker(&mut self) -> Arc<Mutex<DBWorker>> {
-        let mut free = self.free.lock().unwrap();
-        if free.is_empty() {
-            let index = self.workers.len();
-            let dw = DBWorker::new(self.free.clone(), index);
-            self.workers.push(Arc::new(Mutex::new(dw)));
-            free.push(index);
+    pub fn get_free_worker(&self) -> Option<Rc<DBWorker>> {
+        if self.free.borrow().is_empty() {
+            let index = self.workers.borrow().len();
+            let dw = DBWorker::new(index);
+            self.workers.borrow_mut().push(Rc::new(dw));
+            self.free.borrow_mut().push(index);
         }
-        let f_index = free.pop().unwrap();
-        let f_w = self.workers.get(f_index).unwrap().clone();
-        return f_w;
+        let f_index = self.free.borrow_mut().pop().unwrap();
+        self.workers.borrow().get(f_index).map(|x| x.clone())
+    }
+
+    pub fn free(&self, index: usize) {
+        self.free.borrow_mut().push(index);
     }
 }
 
 impl DBWorker {
-    fn new(free: Arc<Mutex<Queue<usize>>>, index: usize) -> Self {
+    fn new(index: usize) -> Self {
         DBWorker {
             index,
-            free,
             connection: establish_connection(),
         }
-    }
-
-    pub fn free(& self){
-        self.free.lock().unwrap().push(self.index);
     }
 }
