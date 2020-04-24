@@ -9,9 +9,9 @@ use crate::zhttp::response_code::ResponseCode;
 
 #[derive(Deserialize)]
 pub struct RootInfo {
-    pub(crate) root_name: String,
-    pub(crate) password: String,
-    pub(crate) email: Option<String>,
+    pub root_name: String,
+    pub password: String,
+    pub email: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -88,7 +88,7 @@ fn create_root_user(root_name: &str,
         user_id: user_id.clone(),
         user_name: root_name.to_string(),
         password: crypto_password(password),
-        email: None,
+        email: email.clone(),
         created_time: current.clone(),
         updated_time: current.clone(),
         last_login_time: current.clone(),

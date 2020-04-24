@@ -1,7 +1,14 @@
 table! {
+    file_storage (storage_id, file_id) {
+        storage_id -> Varchar,
+        file_id -> Varchar,
+    }
+}
+
+table! {
     menu (id) {
         created_by -> Nullable<Varchar>,
-        created_time -> Timestamp,
+        created_time -> Timestamp,      
         updated_by -> Nullable<Varchar>,
         updated_time -> Timestamp,
         id -> Varchar,
@@ -115,6 +122,26 @@ table! {
 }
 
 table! {
+    storage (storage_id) {
+        created_time -> Timestamp,
+        updated_time -> Timestamp,
+        storage_id -> Varchar,
+        storage_name -> Varchar,
+        create_id -> Varchar,
+    }
+}
+
+table! {
+    storage_user (user_id, storage_id) {
+        created_time -> Timestamp,
+        updated_time -> Timestamp,
+        user_id -> Varchar,
+        storage_id -> Varchar,
+        storage_role -> Varchar,
+    }
+}
+
+table! {
     user_group (user_group_id) {
         created_by -> Nullable<Varchar>,
         created_time -> Timestamp,
@@ -173,7 +200,26 @@ table! {
     }
 }
 
+table! {
+    zly_file (file_id) {
+        created_time -> Timestamp,
+        user_id -> Varchar,
+        file_id -> Varchar,
+        file_hash -> Varchar,
+        file_name -> Varchar,
+        file_size -> Int8,
+        file_mime -> Varchar,
+    }
+}
+
+joinable!(file_storage -> storage (storage_id));
+joinable!(file_storage -> zly_file (file_id));
+joinable!(storage_user -> storage (storage_id));
+joinable!(storage_user -> user_info (user_id));
+joinable!(zly_file -> user_info (user_id));
+
 allow_tables_to_appear_in_same_query!(
+    file_storage,
     menu,
     opetation,
     page_element,
@@ -184,9 +230,12 @@ allow_tables_to_appear_in_same_query!(
     power_page_element,
     role,
     role_power,
+    storage,
+    storage_user,
     user_group,
     user_group_role,
     user_group_user_info,
     user_info,
     user_role,
+    zly_file,
 );

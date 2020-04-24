@@ -42,3 +42,17 @@ fn create_salt(len: usize) -> Vec<char> {
     let salt_num = (ran * (factor as f64)) as i64;
     return decimal_to_base(salt_num);
 }
+
+
+#[cfg(test)]
+mod short_id_test {
+    use super::generate_short_id;
+
+    #[test]
+    fn test_short_id() {
+        let len: usize = 12;
+        let id = generate_short_id(len);
+        println!("short id:{}",id.clone());
+        assert_eq!(id, String::from(""))
+    }
+}

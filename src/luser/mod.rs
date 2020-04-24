@@ -14,7 +14,7 @@ pub struct ShowUserInfo {
 }
 
 pub fn validate_user(in_user_id: String, conn: &PgConnection) -> Result<ShowUserInfo, ResponseCode> {
-    use crate::zpostgres::schema::user_info::dsl::{user_info, user_id, user_name, email};
+    use crate::zpostgres::schema::user_info::dsl::{user_info, user_id};
     let result: Vec<UserInfo> = user_info.filter(user_id.eq(in_user_id))
         .load::<UserInfo>(conn).expect("查询用户信息失败");
     if result.len() == 0 {
@@ -28,7 +28,7 @@ pub fn validate_user(in_user_id: String, conn: &PgConnection) -> Result<ShowUser
 }
 
 pub fn validate_user_password(username: &str, sha_pwd: &str, timestamp: u64, conn: &PgConnection) -> Result<UserInfo, ResponseCode> {
-    use crate::zpostgres::schema::user_info::dsl::{user_info, user_name, password};
+    use crate::zpostgres::schema::user_info::dsl::{user_info, user_name};
     let result: Vec<UserInfo> = match user_info.filter(user_name.eq(username)).load::<UserInfo>(conn) {
         Ok(res) => res,
         Err(_) => {

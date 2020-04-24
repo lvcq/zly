@@ -1,17 +1,28 @@
-use actix_web::{HttpResponse, web};
-use actix_session::Session;
-use crate::zpostgres::PgPool;
+use crate::lstorage;
 use crate::lsystem;
+use crate::lsystem::{LoginInfo, RootInfo};
 use crate::luser;
-use crate::lsystem::{RootInfo, LoginInfo};
-use crate::zhttp::{HttpResult, response_json};
-use std::borrow::Borrow;
 use crate::luser::ShowUserInfo;
 use crate::zhttp::response_code::ResponseCode;
-use crate::zpostgres::models::user_info::UserInfo;
-use http::header::CONTENT_TYPE;
+use crate::zhttp::{response_json, HttpResult};
+use crate::zpostgres::PgPool;
+use actix_session::Session;
+use actix_web::{web, HttpResponse};
+use serde::Deserialize;
 
-pub async fn validate_logon(session: Session, db: web::Data<PgPool>) -> Result<HttpResponse, actix_web::Error> {
+pub mod file_upload;
+
+pub use file_upload::file_upload_handler;
+
+#[derive(Deserialize)]
+pub struct NewStorage {
+    pub storage_name: String,
+}
+
+pub async fn validate_logon(
+    session: Session,
+    db: web::Data<PgPool>,
+) -> Result<HttpResponse, actix_web::Error> {
     let mut code: usize = 20000;
     let u_info: Option<ShowUserInfo>;
     let mut msg: String = "".to_string();
@@ -54,7 +65,10 @@ pub async fn validate_init(db: web::Data<PgPool>) -> HttpResponse {
     HttpResponse::Ok().body(serde_json::to_string(&res).unwrap())
 }
 
-pub async fn set_root_info(db: web::Data<PgPool>, info: web::Json<RootInfo>) -> Result<HttpResponse, actix_web::Error> {
+pub async fn set_root_info(
+    db: web::Data<PgPool>,
+    info: web::Json<RootInfo>,
+) -> Result<HttpResponse, actix_web::Error> {
     let db_worker = db.get_free_worker().unwrap();
     let mut msg: Option<String> = None;
     let mut code: usize = 20000;
@@ -79,16 +93,18 @@ pub async fn set_root_info(db: web::Data<PgPool>, info: web::Json<RootInfo>) -> 
 pub async fn user_login(
     db: web::Data<PgPool>,
     session: Session,
-    info: web::Json<LoginInfo>) -> Result<HttpResponse, actix_web::Error> {
+    info: web::Json<LoginInfo>,
+) -> Result<HttpResponse, actix_web::Error> {
     let db_worker = db.get_free_worker().unwrap();
     let mut msg: Option<String> = None;
     let mut code: usize = 20000;
-    let mut user_info: Option<ShowUserInfo> = None;
+    let user_info: Option<ShowUserInfo>;
     match luser::validate_user_password(
         &info.username,
         &info.password,
         info.timestamp,
-        &db_worker.connection) {
+        &db_worker.connection,
+    ) {
         Ok(u_info) => {
             let user_id = u_info.user_id.clone();
             session.set("userId", user_id)?;
@@ -104,5 +120,80 @@ pub async fn user_login(
             msg = Some(r_code.as_str().to_string());
         }
     }
+    db.free(db_worker.index);
     Ok(response_json::<Option<ShowUserInfo>>(code, msg, user_info))
+}
+
+pub async fn add_new_storage_handler(
+    db: web::Data<PgPool>,
+    session: Session,
+    storage_info: web::Json<NewStorage>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let db_worker = db.get_free_worker().unwrap();
+    let mut msg: Option<String> = None;
+    let mut code: usize = 20000;
+    let mut add_success = false;
+    let user_id = match session.get::<String>("userId") {
+        Ok(u_id) => u_id.unwrap(),
+        Err(_) => {
+            db.free(db_worker.index);
+            return Ok(response_json::<bool>(
+                ResponseCode::Code10004.as_code(),
+                Some(ResponseCode::Code10004.as_str().to_string()),
+                false,
+            ));
+        }
+    };
+    match lstorage::add_new_storage(
+        user_id,
+        storage_info.storage_name.clone(),
+        &db_worker.connection,
+    ) {
+        Ok(_) => {
+            add_success = true;
+        }
+        Err(rsc) => {
+            code = rsc.as_code();
+            msg = Some(rsc.as_str().to_string());
+        }
+    }
+    db.free(db_worker.index);
+    return Ok(response_json::<bool>(code, msg, add_success));
+}
+
+pub async fn get_user_storage(
+    db: web::Data<PgPool>,
+    session: Session,
+) -> Result<HttpResponse, actix_web::Error> {
+    let db_worker = db.get_free_worker().unwrap();
+    let mut msg: Option<String> = None;
+    let mut code: usize = 20000;
+    let mut storage_list: Option<Vec<lstorage::StorageInfo>> = None;
+    let user_id = match session.get::<String>("userId") {
+        Ok(u_id) => u_id.unwrap(),
+        Err(_) => {
+            db.free(db_worker.index);
+            return Ok(response_json::<bool>(
+                ResponseCode::Code10004.as_code(),
+                Some(ResponseCode::Code10004.as_str().to_string()),
+                false,
+            ));
+        }
+    };
+
+    match lstorage::get_storage_list_by_user_id(user_id, &db_worker.connection) {
+        Ok(s_l) => {
+            storage_list = Some(s_l);
+        }
+        Err(rsc) => {
+            code = rsc.as_code();
+            msg = Some(rsc.as_str().to_string());
+        }
+    }
+    db.free(db_worker.index);
+    return Ok(response_json::<Option<Vec<lstorage::StorageInfo>>>(
+        code,
+        msg,
+        storage_list,
+    ));
 }

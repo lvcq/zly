@@ -4,7 +4,6 @@ use dotenv::dotenv;
 use std::env;
 use crate::zqueue::Queue;
 use std::cell::RefCell;
-use std::borrow::Borrow;
 use std::rc::Rc;
 
 pub mod models;

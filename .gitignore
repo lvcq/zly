@@ -1,6 +1,7 @@
 /target
+/.idea
 **/*.rs.bk
 /lib/zformdata/target
 /temp
 **/*.swp
-/.idea/
+/.idea/**.xml

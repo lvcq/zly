@@ -3,6 +3,7 @@ use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 
 pub mod short_id;
+pub mod hash;
 
 pub fn current_naive_datetime() -> NaiveDateTime {
     Utc::now().naive_utc()
