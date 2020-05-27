@@ -4,20 +4,35 @@ use crate::yutils::short_id::generate_short_id;
 use crate::zhttp::MultiFile;
 use crate::zhttp::ResponseCode;
 use crate::zpostgres::models::{FileStorage, ZlyFile};
+use chrono::NaiveDateTime;
+use diesel::expression_methods::BoolExpressionMethods;
+use diesel::prelude::JoinOnDsl;
+use diesel::Queryable;
 use diesel::{ExpressionMethods, PgConnection, QueryDsl, QueryResult, RunQueryDsl};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+
+#[derive(Serialize, Deserialize, Queryable)]
+pub struct FileItem {
+    file_id: String,
+    file_name: String,
+    file_mime: String,
+    file_size: i64,
+    created_time: NaiveDateTime,
+}
 
 pub async fn store_file(
     file_info: &MultiFile,
     storage_root_path: &str,
     user_id: String,
     storage_id: String,
+    file_hash: &str,
     conn: &PgConnection,
 ) -> Result<String, ResponseCode> {
     let file_temp_path = file_info.temp_path.clone();
     let mut file_path = PathBuf::from(storage_root_path);
-    file_path.push(&file_info.hash);
+    file_path.push(file_hash);
     // 保存文件到文件夹
     if !is_storage_folder_container_file(&file_path) {
         save_file_to_folder(&file_path, &file_temp_path).await?;
@@ -25,7 +40,7 @@ pub async fn store_file(
     // 存储到数据库，并获取文件ID
     let f_id = save_file_info(
         &user_id,
-        &file_info.hash,
+        file_hash,
         &file_info.filename,
         &file_info.mime,
         file_info.size,
@@ -36,6 +51,12 @@ pub async fn store_file(
     // 关联文件与存储仓库
     file_storage_ref(&f_id, &storage_id, conn)?;
     Ok(f_id)
+}
+
+pub async fn check_file_exist(hash: &str, storage_root_path: &str) -> Result<bool, ResponseCode> {
+    let mut file_path = PathBuf::from(storage_root_path);
+    file_path.push(&hash);
+    Ok(is_storage_folder_container_file(&file_path))
 }
 
 fn is_storage_folder_container_file(file_path: &PathBuf) -> bool {
@@ -174,5 +195,83 @@ fn is_file_storage_ref_exist(
         return Ok(false);
     } else {
         return Ok(true);
+    }
+}
+
+/// 获取文件信息
+
+fn get_file_info(hash: &str, conn: &PgConnection) -> Result<Option<Vec<ZlyFile>>, ResponseCode> {
+    use crate::zpostgres::schema::zly_file::dsl::{file_hash, zly_file};
+    let result: QueryResult<Vec<ZlyFile>> =
+        zly_file.filter(file_hash.eq(hash)).load::<ZlyFile>(conn);
+    if result.is_err() {
+        return Err(ResponseCode::Code10003);
+    }
+    let res_vec = result.unwrap();
+    return if res_vec.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(res_vec))
+    };
+}
+
+/// 关联已经存在的文件和空间
+pub async fn ref_exist_file_and_storage(
+    u_id: &str,
+    file_hash: &str,
+    storage_root_path: &str,
+    file_name: &str,
+    storage_id: &str,
+    conn: &PgConnection,
+) -> Result<String, ResponseCode> {
+    if check_file_exist(file_hash, storage_root_path).await? {
+        if let Some(file_info_vec) = get_file_info(file_hash, conn)? {
+            let file_info = file_info_vec.get(0).unwrap();
+            let f_id = save_file_info(
+                u_id,
+                file_hash,
+                file_name,
+                &file_info.file_mime,
+                file_info.file_size,
+                conn,
+            )?;
+            // 判断空间ID是否正确
+            lstorage::is_storage_id_exist(&storage_id, conn)?;
+            // 关联文件与存储仓库
+            file_storage_ref(&f_id, &storage_id, conn)?;
+            return Ok(f_id);
+        } else {
+            return Err(ResponseCode::Code10003);
+        }
+    // 获取文件信息
+    } else {
+        return Err(ResponseCode::Code10003);
+    }
+}
+/// 通过仓库ID查询文件列表
+///
+pub async fn query_file_list_by_storage_id(
+    s_id: &str,
+    conn: &PgConnection,
+) -> Result<Vec<FileItem>, ResponseCode> {
+    use crate::zpostgres::schema::file_storage;
+    use crate::zpostgres::schema::zly_file;
+    let file_list_query_res = file_storage::table
+        .inner_join(
+            zly_file::table.on(zly_file::file_id
+                .eq(file_storage::file_id)
+                .and(file_storage::storage_id.eq(s_id))),
+        )
+        .select((
+            zly_file::file_id,
+            zly_file::file_name,
+            zly_file::file_mime,
+            zly_file::file_size,
+            zly_file::created_time,
+        ))
+        .load::<FileItem>(conn);
+    match file_list_query_res {
+        Ok(s_l) => Ok(s_l),
+        Err(_) => Err(ResponseCode::Code10003),
     }
 }

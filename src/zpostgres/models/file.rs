@@ -1,7 +1,6 @@
-use chrono::NaiveDateTime;
-use diesel::{Queryable, Insertable};
 use crate::zpostgres::schema::zly_file;
-
+use chrono::NaiveDateTime;
+use diesel::{Insertable, Queryable};
 
 #[derive(Queryable, Insertable)]
 #[table_name = "zly_file"]

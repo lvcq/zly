@@ -1,33 +1,43 @@
+use crate::lfile;
 use crate::lstorage;
 use crate::lsystem;
 use crate::lsystem::{LoginInfo, RootInfo};
 use crate::luser;
 use crate::luser::ShowUserInfo;
 use crate::zhttp::response_code::ResponseCode;
-use crate::zhttp::{response_json, HttpResult};
+use crate::zhttp::{response_json, user_auth, HttpResult};
 use crate::zpostgres::PgPool;
 use actix_session::Session;
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
-
 pub mod file_upload;
+pub mod img;
 
-pub use file_upload::file_upload_handler;
+pub use file_upload::{
+    check_file_exist_in_folder, create_ref_with_exist_file_and_storage, file_upload_handler,
+};
+
+pub use img::{image_parse_handler, image_parse_with_size_or_format, origin_image_handler};
 
 #[derive(Deserialize)]
 pub struct NewStorage {
     pub storage_name: String,
 }
 
+#[derive(Deserialize)]
+pub struct QueryStorageFile {
+    pub storage_id: String,
+}
+
 pub async fn validate_logon(
     session: Session,
     db: web::Data<PgPool>,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, actix_web::error::Error> {
     let mut code: usize = 20000;
     let u_info: Option<ShowUserInfo>;
     let mut msg: String = "".to_string();
     let db_worker = db.get_free_worker().unwrap();
-    if let Some(user_id) = session.get::<String>("userId")? {
+    if let Some(user_id) = session.get::<String>("userId").expect("get user id error") {
         u_info = match luser::validate_user(user_id, &db_worker.connection) {
             Ok(sui) => Some(sui),
             Err(err) => {
@@ -107,7 +117,7 @@ pub async fn user_login(
     ) {
         Ok(u_info) => {
             let user_id = u_info.user_id.clone();
-            session.set("userId", user_id)?;
+            session.set("userId", user_id).expect("set session fail");
             user_info = Some(ShowUserInfo {
                 username: u_info.user_name.clone(),
                 email: u_info.email.clone(),
@@ -196,4 +206,36 @@ pub async fn get_user_storage(
         msg,
         storage_list,
     ));
+}
+
+/// 处理请求空间文件
+pub async fn query_files(
+    query: web::Query<QueryStorageFile>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> Result<HttpResponse, actix_web::Error> {
+    let _user_id = match user_auth(session) {
+        Ok(u_id) => u_id,
+        Err(rsp) => {
+            return Ok(rsp);
+        }
+    };
+    let db_worker = db.get_free_worker().unwrap();
+    let mut code: usize = 20000;
+    let mut msg: Option<String> = None;
+    let mut files: Option<Vec<lfile::FileItem>> = None;
+    match lfile::query_file_list_by_storage_id(&query.storage_id, &db_worker.connection).await {
+        Ok(file_vec) => {
+            files = Some(file_vec);
+        }
+        Err(rsc) => {
+            code = rsc.as_code();
+            msg = Some(rsc.as_str().to_string());
+        }
+    }
+    db.free(db_worker.index);
+
+    Ok(response_json::<Option<Vec<lfile::FileItem>>>(
+        code, msg, files,
+    ))
 }

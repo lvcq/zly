@@ -9,16 +9,16 @@ edition = "2018"
 [dependencies]
 http = "0.2.0"
 mime = "0.3.16"
-actix-web = "2"
+actix-web = "3.0.0-alpha.1"
+actix-http = "2.0.0-alpha.2"
 actix-rt = "1"
 actix-service = "1.0.5"
-actix-session="0.3.0"
-actix-redis = "0.8.1"
-actix-cors = "0.2.0"
-actix-multipart = "0.2.0"
+actix-session="0.4.0-alpha.1"
+actix-redis = "0.9.0-alpha.1"
+actix-cors = "0.3.0-alpha.1"
+actix-files = { path= "./lib/actix-files" }
+actix-multipart = {path= "./lib/actix-multipart"}
 env_logger = "0.7.1"
-tokio = { version = "0.2", features = ["full"] }
-tokio-timer = "0.2.13"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false }
 redis = "0.15.1"
@@ -33,3 +33,4 @@ diesel = { version = "1.4.3", features = ["postgres", "chrono"] }
 dotenv = "0.9.0"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.7.3"
+image = "0.23.4"

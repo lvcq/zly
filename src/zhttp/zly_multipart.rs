@@ -1,14 +1,12 @@
-use actix_multipart::{Multipart, Field};
-use std::collections::HashMap;
-use futures::TryStreamExt;
-use futures::StreamExt;
+use actix_multipart::{Field, Multipart};
+use actix_web::http::header::ContentDisposition;
 use actix_web::web;
+use chrono::Utc;
+use futures::StreamExt;
+use futures::TryStreamExt;
+use std::collections::HashMap;
 use std::io::Write;
 use std::{env, fs};
-use actix_web::http::header::ContentDisposition;
-use chrono::Utc;
-use crypto::sha3::Sha3;
-use crypto::digest::Digest;
 
 #[derive(Debug)]
 pub struct FormDataValue {
@@ -22,9 +20,7 @@ pub struct MultiFile {
     pub temp_path: String,
     pub mime: String,
     pub size: i64,
-    pub hash: String,
 }
-
 
 /// ### 读取`Multipart`数据流中的文件以及字段
 pub async fn transfer_multipart(mut payload: Multipart) -> Result<FormDataValue, actix_web::Error> {
@@ -56,7 +52,6 @@ async fn parse_file(
 ) -> Result<FormDataValue, actix_web::Error> {
     let mut temp_file = env::temp_dir();
     let timestamp = Utc::now().timestamp_millis();
-    let mut hasher = Sha3::sha3_256();
     temp_file.push(format!("{}-{}", timestamp, &filename));
 
     let temp_file_str = temp_file.to_str().unwrap().to_string();
@@ -67,28 +62,37 @@ async fn parse_file(
     // Field in turn is stream of *Bytes* object
     while let Some(chunk) = field.next().await {
         let data = chunk.unwrap();
-        hasher.input(&data.to_vec()[..]);
+        // hasher.input(&data.to_vec()[..]);
         // filesystem operations are blocking, we have to use thread-pool
         f = web::block(move || f.write_all(&data).map(|_| f)).await?;
     }
-    fdv.files.insert(String::from(key), MultiFile {
-        filename: filename.to_string(),
-        temp_path: temp_file_str.clone(),
-        mime: mime_text.to_string(),
-        size: fs::metadata(temp_file_str).unwrap().len() as i64,
-        hash: hasher.result_str(),
-    });
+    fdv.files.insert(
+        String::from(key),
+        MultiFile {
+            filename: filename.to_string(),
+            temp_path: temp_file_str.clone(),
+            mime: mime_text.to_string(),
+            size: fs::metadata(temp_file_str).unwrap().len() as i64,
+        },
+    );
     Ok(fdv)
 }
 
 /// 转换formdata为key:value
-async fn parse_field(mut fdv: FormDataValue, field: &mut Field, key: &str) -> Result<FormDataValue, actix_web::Error> {
+async fn parse_field(
+    mut fdv: FormDataValue,
+    field: &mut Field,
+    key: &str,
+) -> Result<FormDataValue, actix_web::Error> {
     let mut value_vec: Vec<u8> = Vec::new();
     while let Some(chunk) = field.next().await {
         let data = chunk.unwrap().to_vec();
         value_vec.extend_from_slice(&data);
     }
-    fdv.fields.insert(String::from(key), String::from_utf8_lossy(&value_vec).to_string());
+    fdv.fields.insert(
+        String::from(key),
+        String::from_utf8_lossy(&value_vec).to_string(),
+    );
     Ok(fdv)
 }
 
@@ -100,7 +104,6 @@ impl FormDataValue {
         }
     }
 }
-
 
 impl Drop for MultiFile {
     fn drop(&mut self) {
